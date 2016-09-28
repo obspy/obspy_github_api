@@ -3,7 +3,7 @@ import os
 from setuptools import setup
 
 INSTALL_REQUIRES = [
-    'github3.py',  # works with 1.0.0a4
+    'github3.py>=1.0.0a1',  # works with 1.0.0a4
     'obspy',
     ]
 
