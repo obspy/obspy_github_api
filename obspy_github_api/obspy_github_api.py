@@ -78,17 +78,14 @@ def check_docs_build_requested(issue_number):
     return False
 
 
-def get_open_pull_requests():
+def get_pull_requests(state="open", sort="updated", direction="desc"):
     """
-    Fetch a list of issue numbers for open pull requests (max. 100, no
-    pagination), recently updated first, along with the PR data.
+    Fetch a list of issue numbers for pull requests recently updated
+    first, along with the PR data.
     """
     repo = gh.repository("obspy", "obspy")
-    prs = repo.pull_requests(state="open", sort="updated", direction="desc")
-    # (number, fork name, head branch name, head commit SHA)
-    open_prs = [(pr.number, pr.head.user.login, pr.head.ref, pr.head.sha)
-                for pr in prs]
-    return open_prs
+    prs = repo.pull_requests(state=state, sort=sort, direction=direction)
+    return prs
 
 
 def get_commit_status(commit, context=None):
