@@ -23,7 +23,7 @@ def find_packages():
 
 setup(
     name="obspy_github_api",
-    version="0.0.0.dev",
+    version="0.2.0",
     description="Helper routines to interact with obspy/obspy via GitHub API",
     author="Tobias Megies",
     author_email="megies@geophysik.uni-muenchen.de",
