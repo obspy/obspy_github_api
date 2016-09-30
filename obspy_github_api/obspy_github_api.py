@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import copy
 import datetime
 import os
 import re
@@ -7,8 +6,6 @@ import time
 import warnings
 
 import github3
-
-from obspy.core.util.base import DEFAULT_MODULES, ALL_MODULES
 
 
 # regex pattern in comments for requesting a docs build
@@ -30,25 +27,27 @@ except KeyError:
 gh = github3.login(token=token)
 
 
-def check_module_tests_requested(issue_number):
+def check_specific_module_tests_requested(issue_number):
     """
-    Check if tests of specific modules are requested for given issue number
+    Checks if tests of specific modules are requested for given issue number
     (e.g. by magic string '+TESTS:clients.fdsn,clients.arclink' or '+TESTS:ALL'
     anywhere in issue description or comments).
     Accumulates any occurrences of the above magic strings.
 
-    :rtype: list
-    :returns: List of modules names to test for given issue number.
+    :rtype: bool or list
+    :returns: List of specific modules names to test in addition to default
+        modules for given issue number or ``False`` if no specific tests are
+        requested or ``True`` if all modules should be tested.
     """
     issue = gh.issue("obspy", "obspy", issue_number)
-    modules_to_test = set(copy.copy(DEFAULT_MODULES))
+    modules_to_test = set()
 
     # process issue body/description
     match = re.search(PATTERN_TEST_MODULES, issue.body)
     if match:
         modules = match.group(1)
         if modules == "ALL":
-            return ALL_MODULES
+            return True
         modules_to_test = set.union(modules_to_test, modules.split(","))
 
     # process issue comments
@@ -57,10 +56,36 @@ def check_module_tests_requested(issue_number):
         if match:
             modules = match.group(1)
             if modules == "ALL":
-                return ALL_MODULES
+                return True
             modules_to_test = set.union(modules_to_test, modules.split(","))
 
-    return sorted(list(modules_to_test))
+    modules_to_test = sorted(list(modules_to_test))
+
+    if not len(modules_to_test):
+        return False
+
+    return modules_to_test
+
+
+def get_module_test_list(issue_number):
+    """
+    Gets the list of modules that should be tested for the given issue number.
+    This needs obspy to be installed, because DEFAULT_MODULES and ALL_MODULES
+    is used.
+
+    :rtype: list
+    :returns: List of modules names to test for given issue number.
+    """
+    from obspy.core.util.base import DEFAULT_MODULES, ALL_MODULES
+
+    modules_to_test = check_specific_module_tests_requested(issue_number)
+
+    if modules_to_test is False:
+        return DEFAULT_MODULES
+    elif modules_to_test is True:
+        return ALL_MODULES
+    else:
+        return sorted(list(set.union(set(DEFAULT_MODULES), modules_to_test)))
 
 
 def check_docs_build_requested(issue_number):
@@ -139,19 +164,38 @@ def get_commit_time(commit, fork="obspy"):
     return time.mktime(dt.timetuple())
 
 
-def get_issue_numbers_that_need_docs_build(verbose=False):
+def get_issue_numbers_that_request_docs_build(verbose=False):
     """
-    Relies on a local directory with some files to mark when PR docs have been
-    built etc.
+    :rtype: list of int
     """
     open_prs = get_pull_requests(state="open")
+
     if verbose:
         print("Checking the following open PRs if a docs build is requested "
               "and needed: {}".format(str(num for num, _ in open_prs)))
 
-    for number, fork, branch, commit, data in open_prs:
-        if not check_docs_build_requested(number):
-            continue
+    todo = []
+    for pr in open_prs:
+        if check_docs_build_requested(pr.number):
+            todo.append(pr.number)
+
+    return todo
+
+
+def set_pr_docs_that_need_docs_build(
+        pr_docs_info_dir="/home/obspy/pull_request_docs", verbose=False):
+    """
+    Relies on a local directory with some files to mark when PR docs have been
+    built etc.
+    """
+    prs_todo = get_issue_numbers_that_request_docs_build(verbose=verbose)
+
+    for pr in prs_todo:
+        number = pr.number
+        fork = pr.head.user.login
+        branch = pr.head.ref
+        commit = pr.head.sha
+
         # need to figure out time of last push from commit details.. -_-
         time = get_commit_time(commit, fork)
         if verbose:
@@ -159,7 +203,7 @@ def get_issue_numbers_that_need_docs_build(verbose=False):
                   "{}.".format(number, commit,
                                str(datetime.fromtimestamp(time))))
 
-        filename = os.path.join("pull_request_docs", str(number))
+        filename = os.path.join(pr_docs_info_dir, str(number))
         filename_todo = filename + ".todo"
         filename_done = filename + ".done"
 

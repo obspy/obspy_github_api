@@ -4,6 +4,8 @@ from setuptools import setup
 
 INSTALL_REQUIRES = [
     'github3.py>=1.0.0a1',  # works with 1.0.0a4
+    # soft dependency on obspy itself,
+    # for routine `get_module_test_list`
     ]
 
 SETUP_DIRECTORY = os.path.dirname(os.path.abspath(inspect.getfile(
