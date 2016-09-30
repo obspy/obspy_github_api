@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import copy
+import datetime
 import os
 import re
+import time
 import warnings
 
 import github3
 
-from obspy import UTCDateTime
 from obspy.core.util.base import DEFAULT_MODULES, ALL_MODULES
 
 
@@ -128,10 +129,14 @@ def get_commit_status(commit, context=None):
 
 def get_commit_time(commit, fork="obspy"):
     """
+    :rtype: float
+    :returns: Commit timestamp as POSIX timestamp.
     """
     repo = gh.repository(fork, "obspy")
     commit = repo.commit(commit)
-    return UTCDateTime(commit.commit.committer["date"])
+    dt = datetime.datetime.strptime(commit.commit.committer["date"],
+                                    '%Y-%m-%dT%H:%M:%SZ')
+    return time.mktime(dt.timetuple())
 
 
 def get_issue_numbers_that_need_docs_build(verbose=False):
@@ -139,7 +144,7 @@ def get_issue_numbers_that_need_docs_build(verbose=False):
     Relies on a local directory with some files to mark when PR docs have been
     built etc.
     """
-    open_prs = get_open_pull_requests()
+    open_prs = get_pull_requests(state="open")
     if verbose:
         print("Checking the following open PRs if a docs build is requested "
               "and needed: {}".format(str(num for num, _ in open_prs)))
@@ -151,8 +156,8 @@ def get_issue_numbers_that_need_docs_build(verbose=False):
         time = get_commit_time(commit, fork)
         if verbose:
             print("PR #{} requests a docs build, latest commit {} at "
-                  "{}.".format(number, commit, time))
-        time = int(time.timestamp)
+                  "{}.".format(number, commit,
+                               str(datetime.fromtimestamp(time))))
 
         filename = os.path.join("pull_request_docs", str(number))
         filename_todo = filename + ".todo"
@@ -168,11 +173,12 @@ def get_issue_numbers_that_need_docs_build(verbose=False):
 
         # check if nothing needs to be done..
         if os.path.exists(filename_done):
-            time_done = UTCDateTime(os.stat(filename_done).st_atime)
+            time_done = os.stat(filename_done).st_atime
             if time_done > time:
                 if verbose:
                     print("PR #{} was last built at {} and does not need a "
-                          "new build.".format(number, time_done))
+                          "new build.".format(
+                              number, str(datetime.fromtimestamp(time_done))))
                 continue
         # ..otherwise touch the .todo file
         with open(filename_todo, "wb"):
@@ -231,7 +237,7 @@ def set_all_updated_pull_requests_docker_testbot_pending(verbose=False):
     Set a status "pending" for all open PRs that have not been processed by
     docker buildbot yet.
     """
-    open_prs = get_open_pull_requests()
+    open_prs = get_pull_requests(state="open")
     if verbose:
         print("Working on PRs: " + ", ".join(
             [str(number) for number, _, _, _, _ in open_prs]))
