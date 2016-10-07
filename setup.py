@@ -1,5 +1,6 @@
 import inspect
 import os
+import re
 from setuptools import setup
 
 INSTALL_REQUIRES = [
@@ -10,6 +11,14 @@ INSTALL_REQUIRES = [
 
 SETUP_DIRECTORY = os.path.dirname(os.path.abspath(inspect.getfile(
     inspect.currentframe())))
+
+
+# get the package version from from the main __init__ file.
+version_regex_pattern = r"__version__ += +(['\"])([^\1]+)\1"
+for line in open(os.path.join(SETUP_DIRECTORY, 'obspy_github_api',
+                              '__init__.py')):
+    if '__version__' in line:
+        version = re.match(version_regex_pattern, line).group(2)
 
 
 def find_packages():
@@ -25,7 +34,7 @@ def find_packages():
 
 setup(
     name="obspy_github_api",
-    version="0.0.0.dev",
+    version=version,
     description="Helper routines to interact with obspy/obspy via GitHub API",
     author="Tobias Megies",
     author_email="megies@geophysik.uni-muenchen.de",
