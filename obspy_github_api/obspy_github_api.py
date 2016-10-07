@@ -295,3 +295,60 @@ def set_all_updated_pull_requests_docker_testbot_pending(verbose=False):
             description="docker testbot results not available yet",
             only_when_no_status_yet=True,
             verbose=verbose)
+
+
+def get_docker_build_targets(
+        context="docker-testbot", branches=["master", "maintenance_1.0.x"],
+        prs=True):
+    """
+    Returns a list of build targets that need a build of a given context.
+
+    Checks potential build targets, i.e. tips of open pull requests and tips of
+    main branches (like "master"), whether they have a commit status of a given
+    context or not.
+    Returns a (space separated) string representation of the list of build
+    targets as interpreted by the docker testing script in obspy/misc/docker
+    (space separated list, individual build targets as `PRNUMBER_REPO:REF`,
+    e.g.
+    'XXX_obspy:master 1541_obspy:3edade31350b945620447a3b78f80c26782407ae').
+
+    :type context: str
+    :param context: Commit status context to check.
+    :type branches: list
+    :param branches: Branches to include as potential build targets.
+    :type prs: bool
+    :param prs: Whether to include open pull requests as potential build
+        targets or not.
+    :returns: String representation of list of build targets for use in docker
+        testbot bash script (obspy/misc/docker).
+    :rtype: string
+    """
+    if not branches and not prs:
+        return ''
+
+    status_needs_build = (None, 'pending')
+    targets = []
+    repo = gh.repository('obspy', 'obspy')
+
+    if branches:
+        for name in branches:
+            branch = repo.branch(name)
+            sha = branch.commit.sha
+            status = get_commit_status(sha)
+            if status not in status_needs_build:
+                continue
+            # branches don't have a PR number, use dummy placeholder 'XXX' so
+            # that variable splitting in bash still works
+            targets.append('XXX_obspy:{}'.format(sha))
+
+    if prs:
+        open_prs = get_pull_requests(state='open')
+        for pr in open_prs:
+            fork = pr.head.user
+            sha = pr.head.sha
+            status = get_commit_status(sha)
+            if status not in status_needs_build:
+                continue
+            targets.append('{}_{}:{}'.format(str(pr.number), fork, sha))
+
+    return ' '.join(targets)
