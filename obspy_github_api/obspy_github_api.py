@@ -114,14 +114,18 @@ def get_pull_requests(state="open", sort="updated", direction="desc"):
     return prs
 
 
-def get_commit_status(commit, context=None):
+def get_commit_status(commit, context=None, fork='obspy'):
     """
     Return current commit status. Either for a specific context, or overall.
 
     :type commit: str
+    :param commit: Commit SHA.
     :type context: str
     :param context: Commit status context (as a str) or ``None`` for overall
         commit status.
+    :type fork: str
+    :param fork: Obspy fork for commit (for commits on pull requests, 'obspy'
+        should also work for commits on forks).
     :rtype: str or ``None``
     :returns: Current commit status (overall or for specific context) as a
         string or ``None`` if given context has no status.
@@ -129,7 +133,7 @@ def get_commit_status(commit, context=None):
     # github3.py seems to lack support for fetching the "current" statuses for
     # all contexts.. (which is available in "combined status" for an SHA
     # through github API)
-    repo = gh.repository("obspy", "obspy")
+    repo = gh.repository(fork, "obspy")
     commit = repo.commit(commit)
     statuses = {}
     for status in commit.statuses():
@@ -284,10 +288,10 @@ def set_all_updated_pull_requests_docker_testbot_pending(verbose=False):
     open_prs = get_pull_requests(state="open")
     if verbose:
         print("Working on PRs: " + ", ".join(
-            [str(number) for number, _, _, _, _ in open_prs]))
-    for number, fork, branch, commit, data in open_prs:
+            [str(pr.number) for pr in open_prs]))
+    for pr in open_prs:
         set_commit_status(
-            commit=commit, status="pending", context="docker-testbot",
+            commit=pr.commit, status="pending", context="docker-testbot",
             description="docker testbot results not available yet",
             only_when_no_status_yet=True,
             verbose=verbose)
