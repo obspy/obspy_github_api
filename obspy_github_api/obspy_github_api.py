@@ -334,7 +334,7 @@ def get_docker_build_targets(
         for name in branches:
             branch = repo.branch(name)
             sha = branch.commit.sha
-            status = get_commit_status(sha)
+            status = get_commit_status(sha, context=context)
             if status not in status_needs_build:
                 continue
             # branches don't have a PR number, use dummy placeholder 'XXX' so
@@ -346,7 +346,7 @@ def get_docker_build_targets(
         for pr in open_prs:
             fork = pr.head.user
             sha = pr.head.sha
-            status = get_commit_status(sha)
+            status = get_commit_status(sha, context=context)
             if status not in status_needs_build:
                 continue
             targets.append('{}_{}:{}'.format(str(pr.number), fork, sha))
