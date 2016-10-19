@@ -291,7 +291,7 @@ def set_all_updated_pull_requests_docker_testbot_pending(verbose=False):
             [str(pr.number) for pr in open_prs]))
     for pr in open_prs:
         set_commit_status(
-            commit=pr.commit, status="pending", context="docker-testbot",
+            commit=pr.head.sha, status="pending", context="docker-testbot",
             description="docker testbot results not available yet",
             only_when_no_status_yet=True,
             verbose=verbose)
