@@ -22,9 +22,9 @@ except KeyError:
     msg = ("Could not get authorization token for ObsPy github API "
            "(env variable OBSPY_COMMIT_STATUS_TOKEN)")
     warnings.warn(msg)
-    token = None
-
-gh = github3.login(token=token)
+    gh = github3.GitHub()
+else:
+    gh = github3.login(token=token)
 
 
 def check_specific_module_tests_requested(issue_number):
