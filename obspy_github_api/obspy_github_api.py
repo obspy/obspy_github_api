@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
+import ast
 import datetime
+import importlib.util
+import json
 import os
 import re
 import time
 import warnings
 from functools import lru_cache
+from pathlib import Path
 
 import github3
 
@@ -75,16 +79,29 @@ def check_specific_module_tests_requested(issue_number, token=None):
     return modules_to_test
 
 
-def get_module_test_list(issue_number, token=None):
+def get_module_test_list(
+        issue_number,
+        token=None,
+        module_path='./obspy/core/util/base.py',
+):
     """
     Gets the list of modules that should be tested for the given issue number.
-    This needs obspy to be installed, because DEFAULT_MODULES and ALL_MODULES
-    is used.
+
+    If obspy is installed get DEFAULT_MODULES and ALL_MODULES from
+    core.util.base, else use `constants_path` to look for the constants file
+    which contains these lists and no other ObsPy imports.
 
     :rtype: list
     :returns: List of modules names to test for given issue number.
     """
-    from obspy.core.util.base import DEFAULT_MODULES, ALL_MODULES
+    try:  # If ObsPy is installed just use module list from expected place.
+        from obspy.core.util.base import DEFAULT_MODULES, ALL_MODULES
+    except (ImportError, ModuleNotFoundError):  # Else parse the module.
+        names = {"DEFAULT_MODULES", "NETWORK_MODULES"}
+        values = get_values_from_module(module_path, names)
+        DEFAULT_MODULES = values["DEFAULT_MODULES"]
+        NETWORK_MODULES = values["NETWORK_MODULES"]
+        ALL_MODULES = DEFAULT_MODULES + NETWORK_MODULES
 
     modules_to_test = check_specific_module_tests_requested(issue_number, token)
 
@@ -94,6 +111,35 @@ def get_module_test_list(issue_number, token=None):
         return ALL_MODULES
     else:
         return sorted(list(set.union(set(DEFAULT_MODULES), modules_to_test)))
+
+
+def get_values_from_module(node, names):
+    """
+    Get values assigned to specified variables from a python file without
+    importing it. Only works on variables assigned to simple objects.
+
+    Based on this SO answer: https://stackoverflow.com/a/67692/3645626
+
+    :rtype: dict
+    :returns: A dict of {name: value} for specified names.
+    """
+    # Create output dict and specify names to search for.
+    requested_names = {} if names is None else set(names)
+    out = {}
+
+    # A path was given, get the ast from it.
+    if isinstance(node, (str, Path)):
+        node = ast.parse(open(node).read())
+
+    # Parse nodes, any assignments to any of requested_names is saved.
+    if hasattr(node, 'body'):
+        for subnode in node.body:
+            out.update(get_values_from_module(subnode, names=requested_names))
+    elif isinstance(node, ast.Assign):
+        for name in node.targets:
+            if isinstance(name, ast.Name) and name.id in requested_names:
+                out[name.id] = ast.literal_eval(node.value)
+    return out
 
 
 def check_docs_build_requested(issue_number, token):
@@ -369,14 +415,22 @@ def get_docker_build_targets(
     return ' '.join(targets)
 
 
-def print_module_test_list(issue_number, token=None):
+def make_ci_json_config(issue_number, path='obspy_ci_conf.json', token=None):
     """
-    Print the module list to specify which tests should be run.
+    Make a json file for configuring additional actions in CI.
 
-    This is primarily used for setting variables in CI.
+    Indicates which modules are to be run by tests and if docs are to be built.
     """
+    # It would be interesting to make this more generic by parsing any magic
+    # comment string to use for later actions.
     module_list = get_module_test_list(issue_number, token=token)
-    out_str = ('obspy.' + ',obspy.').join(module_list)
-    print(out_str)
+    docs = check_docs_build_requested(issue_number, token=token)
 
+    out = dict(
+        module_list=('obspy.' + ',obspy.').join(module_list),
+        module_list_spaces=' '.join(module_list),
+        docs=docs,
+    )
 
+    with open(path, 'w') as fi:
+        json.dump(out, fi)
