@@ -1,12 +1,22 @@
+"""
+Setup for ObsPy's github api package.
+
+Typically this is just used in CI pipelines.
+"""
 import inspect
 import os
 import re
+import sys
 from setuptools import setup
+
+if sys.version_info < (2, 7):
+    sys.exit('Python < 2.7 is not supported')
 
 INSTALL_REQUIRES = [
     'github3.py>=1.0.0a1',  # works with 1.0.0a4
-    # soft dependency on obspy itself,
-    # for routine `get_module_test_list`
+    # soft dependency on ObsPy itself, for function `get_module_test_list`
+    # or the path to obspy.core.utils.base.py can be provided to avoid
+    # needing to have ObsPy installed.
     ]
 
 SETUP_DIRECTORY = os.path.dirname(os.path.abspath(inspect.getfile(
@@ -32,6 +42,7 @@ def find_packages():
             modules.append(os.path.relpath(dirpath, SETUP_DIRECTORY))
     return [_i.replace(os.sep, ".") for _i in modules]
 
+
 setup(
     name="obspy_github_api",
     version=version,
@@ -41,6 +52,7 @@ setup(
     url="https://github.com/obspy/obspy_github_api",
     download_url="https://github.com/obspy/obspy_github_api.git",
     install_requires=INSTALL_REQUIRES,
+    python_requires='>3.5',
     keywords=["obspy", "github"],
     packages=find_packages(),
     entry_points={},
