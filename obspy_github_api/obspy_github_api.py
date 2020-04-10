@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import ast
 import datetime
-import importlib.util
 import json
 import os
 import re
@@ -14,9 +13,9 @@ import github3
 
 
 # regex pattern in comments for requesting a docs build
-PATTERN_DOCS_BUILD = r'\+DOCS'
+PATTERN_DOCS_BUILD = r"\+DOCS"
 # regex pattern in comments for requesting tests of specific submodules
-PATTERN_TEST_MODULES = r'\+TESTS:([a-zA-Z0-9_\.,]*)'
+PATTERN_TEST_MODULES = r"\+TESTS:([a-zA-Z0-9_\.,]*)"
 
 
 @lru_cache()
@@ -29,8 +28,10 @@ def get_github_client(token=None):
     """
     token = token or os.environ.get("GITHUB_TOKEN", None)
     if token is None:
-        msg = ("Could not get authorization token for ObsPy github API "
-               "(env variable OBSPY_COMMIT_STATUS_TOKEN)")
+        msg = (
+            "Could not get authorization token for ObsPy github API "
+            "(env variable OBSPY_COMMIT_STATUS_TOKEN)"
+        )
         warnings.warn(msg)
         gh = github3.GitHub()
     else:
@@ -80,9 +81,7 @@ def check_specific_module_tests_requested(issue_number, token=None):
 
 
 def get_module_test_list(
-        issue_number,
-        token=None,
-        module_path='./obspy/core/util/base.py',
+    issue_number, token=None, module_path="./obspy/core/util/base.py"
 ):
     """
     Gets the list of modules that should be tested for the given issue number.
@@ -132,7 +131,7 @@ def get_values_from_module(node, names):
         node = ast.parse(open(node).read())
 
     # Parse nodes, any assignments to any of requested_names is saved.
-    if hasattr(node, 'body'):
+    if hasattr(node, "body"):
         for subnode in node.body:
             out.update(get_values_from_module(subnode, names=requested_names))
     elif isinstance(node, ast.Assign):
@@ -142,7 +141,7 @@ def get_values_from_module(node, names):
     return out
 
 
-def check_docs_build_requested(issue_number, token):
+def check_docs_build_requested(issue_number, token=None):
     """
     Check if a docs build was requested for given issue number (by magic string
     '+DOCS' anywhere in issue comments).
@@ -170,7 +169,7 @@ def get_pull_requests(state="open", sort="updated", direction="desc", token=None
     return prs
 
 
-def get_commit_status(commit, context=None, fork='obspy', token=None):
+def get_commit_status(commit, context=None, fork="obspy", token=None):
     """
     Return current commit status. Either for a specific context, or overall.
 
@@ -194,8 +193,10 @@ def get_commit_status(commit, context=None, fork='obspy', token=None):
     commit = repo.commit(commit)
     statuses = {}
     for status in commit.statuses():
-        if (status.context not in statuses or
-                status.updated_at > statuses[status.context].updated_at):
+        if (
+            status.context not in statuses
+            or status.updated_at > statuses[status.context].updated_at
+        ):
             statuses[status.context] = status
 
     # just return current status for given context
@@ -221,8 +222,9 @@ def get_commit_time(commit, fork="obspy", token=None):
     gh = get_github_client(token)
     repo = gh.repository(fork, "obspy")
     commit = repo.commit(commit)
-    dt = datetime.datetime.strptime(commit.commit.committer["date"],
-                                    '%Y-%m-%dT%H:%M:%SZ')
+    dt = datetime.datetime.strptime(
+        commit.commit.committer["date"], "%Y-%m-%dT%H:%M:%SZ"
+    )
     return time.mktime(dt.timetuple())
 
 
@@ -230,11 +232,13 @@ def get_issue_numbers_that_request_docs_build(verbose=False, token=None):
     """
     :rtype: list of int
     """
-    open_prs = get_pull_requests(state="open", token=None)
+    open_prs = get_pull_requests(state="open", token=token)
 
     if verbose:
-        print("Checking the following open PRs if a docs build is requested "
-              "and needed: {}".format(str(num for num, _ in open_prs)))
+        print(
+            "Checking the following open PRs if a docs build is requested "
+            "and needed: {}".format(str(num for num, _ in open_prs))
+        )
 
     todo = []
     for pr in open_prs:
@@ -245,7 +249,8 @@ def get_issue_numbers_that_request_docs_build(verbose=False, token=None):
 
 
 def set_pr_docs_that_need_docs_build(
-        pr_docs_info_dir="/home/obspy/pull_request_docs", verbose=False, token=None):
+    pr_docs_info_dir="/home/obspy/pull_request_docs", verbose=False, token=None
+):
     """
     Relies on a local directory with some files to mark when PR docs have been
     built etc.
@@ -261,9 +266,10 @@ def set_pr_docs_that_need_docs_build(
         # need to figure out time of last push from commit details.. -_-
         time = get_commit_time(commit, fork)
         if verbose:
-            print("PR #{} requests a docs build, latest commit {} at "
-                  "{}.".format(number, commit,
-                               str(datetime.fromtimestamp(time))))
+            print(
+                "PR #{} requests a docs build, latest commit {} at "
+                "{}.".format(number, commit, str(datetime.fromtimestamp(time)))
+            )
 
         filename = os.path.join(pr_docs_info_dir, str(number))
         filename_todo = filename + ".todo"
@@ -282,9 +288,12 @@ def set_pr_docs_that_need_docs_build(
             time_done = os.stat(filename_done).st_atime
             if time_done > time:
                 if verbose:
-                    print("PR #{} was last built at {} and does not need a "
-                          "new build.".format(
-                              number, str(datetime.fromtimestamp(time_done))))
+                    print(
+                        "PR #{} was last built at {} and does not need a "
+                        "new build.".format(
+                            number, str(datetime.fromtimestamp(time_done))
+                        )
+                    )
                 continue
         # ..otherwise touch the .todo file
         with open(filename_todo, "wb"):
@@ -295,9 +304,18 @@ def set_pr_docs_that_need_docs_build(
         print("Done checking which PRs require a docs build.")
 
 
-def set_commit_status(commit, status, context, description,
-                      target_url=None, fork="obspy", only_when_changed=True,
-                      only_when_no_status_yet=False, verbose=False, token=None):
+def set_commit_status(
+    commit,
+    status,
+    context,
+    description,
+    target_url=None,
+    fork="obspy",
+    only_when_changed=True,
+    only_when_no_status_yet=False,
+    verbose=False,
+    token=None,
+):
     """
     :param only_when_changed: Whether to only set a status if the commit status
         would change (commit statuses can not be updated or deleted and there
@@ -320,23 +338,35 @@ def set_commit_status(commit, status, context, description,
         if only_when_no_status_yet:
             if current_status is not None:
                 if verbose:
-                    print("Commit {} already has a commit status ({}), "
-                          "skipping.".format(commit, current_status))
+                    print(
+                        "Commit {} already has a commit status ({}), "
+                        "skipping.".format(commit, current_status)
+                    )
                 return
         if only_when_changed:
             if current_status == status:
                 if verbose:
-                    print("Commit {} status would not change ({}), "
-                          "skipping.".format(commit, current_status))
+                    print(
+                        "Commit {} status would not change ({}), "
+                        "skipping.".format(commit, current_status)
+                    )
                 return
 
     repo = gh.repository(fork, "obspy")
     commit = repo.commit(commit)
-    repo.create_status(sha=commit.sha, state=status, context=context,
-                       description=description, target_url=target_url)
+    repo.create_status(
+        sha=commit.sha,
+        state=status,
+        context=context,
+        description=description,
+        target_url=target_url,
+    )
     if verbose:
-        print("Set commit {} status (context '{}') to '{}'.".format(
-            commit.sha, context, status))
+        print(
+            "Set commit {} status (context '{}') to '{}'.".format(
+                commit.sha, context, status
+            )
+        )
 
 
 def set_all_updated_pull_requests_docker_testbot_pending(verbose=False, token=None):
@@ -347,19 +377,24 @@ def set_all_updated_pull_requests_docker_testbot_pending(verbose=False, token=No
 
     open_prs = get_pull_requests(state="open", token=token)
     if verbose:
-        print("Working on PRs: " + ", ".join(
-            [str(pr.number) for pr in open_prs]))
+        print("Working on PRs: " + ", ".join([str(pr.number) for pr in open_prs]))
     for pr in open_prs:
         set_commit_status(
-            commit=pr.head.sha, status="pending", context="docker-testbot",
+            commit=pr.head.sha,
+            status="pending",
+            context="docker-testbot",
             description="docker testbot results not available yet",
             only_when_no_status_yet=True,
-            verbose=verbose)
+            verbose=verbose,
+        )
 
 
 def get_docker_build_targets(
-        context="docker-testbot", branches=["master", "maintenance_1.0.x"],
-        prs=True, token=None):
+    context="docker-testbot",
+    branches=["master", "maintenance_1.0.x"],
+    prs=True,
+    token=None,
+):
     """
     Returns a list of build targets that need a build of a given context.
 
@@ -384,12 +419,12 @@ def get_docker_build_targets(
     :rtype: string
     """
     if not branches and not prs:
-        return ''
+        return ""
 
     gh = get_github_client(token)
-    status_needs_build = (None, 'pending')
+    status_needs_build = (None, "pending")
     targets = []
-    repo = gh.repository('obspy', 'obspy')
+    repo = gh.repository("obspy", "obspy")
 
     if branches:
         for name in branches:
@@ -400,22 +435,22 @@ def get_docker_build_targets(
                 continue
             # branches don't have a PR number, use dummy placeholder 'XXX' so
             # that variable splitting in bash still works
-            targets.append('XXX_obspy:{}'.format(sha))
+            targets.append("XXX_obspy:{}".format(sha))
 
     if prs:
-        open_prs = get_pull_requests(state='open')
+        open_prs = get_pull_requests(state="open")
         for pr in open_prs:
             fork = pr.head.user
             sha = pr.head.sha
             status = get_commit_status(sha, context=context)
             if status not in status_needs_build:
                 continue
-            targets.append('{}_{}:{}'.format(str(pr.number), fork, sha))
+            targets.append("{}_{}:{}".format(str(pr.number), fork, sha))
 
-    return ' '.join(targets)
+    return " ".join(targets)
 
 
-def make_ci_json_config(issue_number, path='obspy_ci_conf.json', token=None):
+def make_ci_json_config(issue_number, path="obspy_ci_conf.json", token=None):
     """
     Make a json file for configuring additional actions in CI.
 
@@ -427,10 +462,15 @@ def make_ci_json_config(issue_number, path='obspy_ci_conf.json', token=None):
     docs = check_docs_build_requested(issue_number, token=token)
 
     out = dict(
-        module_list=('obspy.' + ',obspy.').join(module_list),
-        module_list_spaces=' '.join(module_list),
+        module_list=("obspy." + ",obspy.").join(module_list),
+        module_list_spaces=" ".join(module_list),
         docs=docs,
     )
 
-    with open(path, 'w') as fi:
-        json.dump(out, fi)
+    # make sure path exists
+    path = Path(path)
+    path_dir = path if path.is_dir() else path.parent
+    path_dir.mkdir(exist_ok=True, parents=True)
+
+    with path.open("w") as fi:
+        json.dump(out, fi, indent=4)
