@@ -1,0 +1,23 @@
+*~
+\#*
+.#*
+*.egg-info/
+*.exp
+*.lib
+*.obj
+*.pyc
+*.pyd.manifest
+*.pyo
+.cache
+.DS_Store
+.idea
+.project
+.pydevproject
+/.settings
+build/
+dist/
+__pycache__
+debian
+# Temporary dir for the anaconda builds.
+misc/installer/anaconda/conda_builds
+.vscode/**
