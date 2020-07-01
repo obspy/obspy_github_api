@@ -11,7 +11,6 @@ from pathlib import Path
 
 import github3
 
-
 # regex pattern in comments for requesting a docs build
 PATTERN_DOCS_BUILD = r"\+DOCS"
 # regex pattern in comments for requesting tests of specific submodules
@@ -30,7 +29,7 @@ def get_github_client(token=None):
     if token is None:
         msg = (
             "Could not get authorization token for ObsPy github API "
-            "(env variable OBSPY_COMMIT_STATUS_TOKEN)"
+            "(env variable GITHUB_TOKEN)"
         )
         warnings.warn(msg)
         gh = github3.GitHub()
@@ -223,9 +222,9 @@ def get_commit_time(commit, fork="obspy", token=None):
     repo = gh.repository(fork, "obspy")
     commit = repo.commit(commit)
     dt = datetime.datetime.strptime(
-        commit.commit.committer["date"], "%Y-%m-%dT%H:%M:%SZ"
+        commit.commit["committer"]["date"], "%Y-%m-%dT%H:%M:%SZ"
     )
-    return time.mktime(dt.timetuple())
+    return dt.timestamp()
 
 
 def get_issue_numbers_that_request_docs_build(verbose=False, token=None):
@@ -460,17 +459,20 @@ def make_ci_json_config(issue_number, path="obspy_ci_conf.json", token=None):
     # comment string to use for later actions.
     module_list = get_module_test_list(issue_number, token=token)
     docs = check_docs_build_requested(issue_number, token=token)
+    module_list_obspy_prepended = [f"obspy.{x}" for x in module_list]
 
     out = dict(
-        module_list=("obspy." + ",obspy.").join(module_list),
+        module_list=",".join(module_list_obspy_prepended),
         module_list_spaces=" ".join(module_list),
         docs=docs,
     )
 
-    # make sure path exists
-    path = Path(path)
-    path_dir = path if path.is_dir() else path.parent
-    path_dir.mkdir(exist_ok=True, parents=True)
+    # Write output to file if path is not None
+    if path is not None:
+        path = Path(path)
+        path_dir = path if path.is_dir() else path.parent
+        path_dir.mkdir(exist_ok=True, parents=True)
+        with path.open("w") as fi:
+            json.dump(out, fi, indent=4)
 
-    with path.open("w") as fi:
-        json.dump(out, fi, indent=4)
+    return out
