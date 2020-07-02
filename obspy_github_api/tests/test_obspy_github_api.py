@@ -8,6 +8,7 @@ from obspy_github_api import (
     get_commit_time,
     get_issue_numbers_that_request_docs_build,
     get_module_test_list,
+    make_ci_json_config,
 )
 
 
@@ -62,7 +63,7 @@ def test_get_commit_status():
 
 def test_get_commit_time():
     sha = "f74e0f5bcf26a47df6138c1ce026d9d14d68c4d7"
-    assert get_commit_time(sha) == 1471873965.0
+    assert get_commit_time(sha) == 1471906365.0
 
 
 def test_get_issue_numbers_that_request_docs_build():
@@ -70,3 +71,12 @@ def test_get_issue_numbers_that_request_docs_build():
     assert isinstance(issues, list)
     for issue in issues:
         assert isinstance(issue, int)
+
+
+def test_json_ci_config():
+    """Tests contents of configuration dict."""
+    config_dict = make_ci_json_config(100, path=None)
+    assert isinstance(config_dict, dict)
+    # ensure module list elements don't end in '.'
+    module_list_split = config_dict["module_list"].split(",")
+    assert all([not x.endswith(".") for x in module_list_split])

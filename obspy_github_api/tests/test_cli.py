@@ -1,9 +1,7 @@
 """
 Tests for command line interface.
 """
-import contextlib
 import json
-import unittest
 import tempfile
 from pathlib import Path
 from subprocess import run
