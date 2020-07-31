@@ -10,10 +10,10 @@ The easiest way to use obspy_github_api is via its command line interface.
 obshub make_config 101 --path obspy_config.json
 
 # Read a specified option.
-obshub read_config_value module_list --path obspy_config.json
+obshub read-config-value module_list --path obspy_config.json
 
 # Use a value in the config in another command line utility.
-export BUILDDOCS=`bshub read_config_value module_list --path obspy_config.json`
+export BUILDDOCS=`obshub read-config-value module_list --path obspy_config.json`
 some-other-command --docs $BUILDDOCS
 ```
 

@@ -4,7 +4,6 @@ import datetime
 import json
 import os
 import re
-import time
 import warnings
 from functools import lru_cache
 from pathlib import Path
@@ -38,7 +37,7 @@ def get_github_client(token=None):
     return gh
 
 
-def check_specific_module_tests_requested(issue_number, token=None):
+def get_requested_modules(issue_number, token=None):
     """
     Checks if tests of specific modules are requested for given issue number
     (e.g. by magic string '+TESTS:clients.fdsn,clients.arclink' or '+TESTS:ALL'
@@ -79,8 +78,21 @@ def check_specific_module_tests_requested(issue_number, token=None):
     return modules_to_test
 
 
+def get_obspy_module_lists(module_path="./obspy/core/util/base.py"):
+    """Return a dict of lists of obspy's default, network, and all modules."""
+    try:  # If ObsPy is installed just use module list from expected place.
+        from obspy.core.util.base import DEFAULT_MODULES, ALL_MODULES, NETWORK_MODULES
+    except (ImportError, ModuleNotFoundError):  # Else parse the module.
+        names = {"DEFAULT_MODULES", "NETWORK_MODULES"}
+        values = get_values_from_module(module_path, names)
+        DEFAULT_MODULES = values["DEFAULT_MODULES"]
+        NETWORK_MODULES = values["NETWORK_MODULES"]
+        ALL_MODULES = DEFAULT_MODULES + NETWORK_MODULES
+    return dict(all=ALL_MODULES, default=DEFAULT_MODULES, network=NETWORK_MODULES)
+
+
 def get_module_test_list(
-    issue_number, token=None, module_path="./obspy/core/util/base.py"
+    issue_number, token=None, module_path="./obspy/core/util/base.py",
 ):
     """
     Gets the list of modules that should be tested for the given issue number.
@@ -92,23 +104,16 @@ def get_module_test_list(
     :rtype: list
     :returns: List of modules names to test for given issue number.
     """
-    try:  # If ObsPy is installed just use module list from expected place.
-        from obspy.core.util.base import DEFAULT_MODULES, ALL_MODULES
-    except (ImportError, ModuleNotFoundError):  # Else parse the module.
-        names = {"DEFAULT_MODULES", "NETWORK_MODULES"}
-        values = get_values_from_module(module_path, names)
-        DEFAULT_MODULES = values["DEFAULT_MODULES"]
-        NETWORK_MODULES = values["NETWORK_MODULES"]
-        ALL_MODULES = DEFAULT_MODULES + NETWORK_MODULES
-
-    modules_to_test = check_specific_module_tests_requested(issue_number, token)
-
+    mod_dict = get_obspy_module_lists(module_path)
+    modules_to_test = get_requested_modules(issue_number, token)
+    # Set to default or all
     if modules_to_test is False:
-        return DEFAULT_MODULES
+        modules_to_test = mod_dict["default"]
     elif modules_to_test is True:
-        return ALL_MODULES
-    else:
-        return sorted(list(set.union(set(DEFAULT_MODULES), modules_to_test)))
+        modules_to_test = mod_dict["all"]
+    # filter out any modules which don't exist
+    modules_to_test = set(modules_to_test) & set(mod_dict["all"])
+    return sorted(list(set.union(set(mod_dict["default"]), modules_to_test)))
 
 
 def get_values_from_module(node, names):
@@ -449,6 +454,14 @@ def get_docker_build_targets(
     return " ".join(targets)
 
 
+def _append_obspy(module_list):
+    """
+    Append the string 'obspy.' to each string in module list for use in coverage.
+    """
+    module_list_obspy_prepended = [f"obspy.{x}" for x in module_list]
+    return module_list_obspy_prepended
+
+
 def make_ci_json_config(issue_number, path="obspy_ci_conf.json", token=None):
     """
     Make a json file for configuring additional actions in CI.
@@ -459,7 +472,7 @@ def make_ci_json_config(issue_number, path="obspy_ci_conf.json", token=None):
     # comment string to use for later actions.
     module_list = get_module_test_list(issue_number, token=token)
     docs = check_docs_build_requested(issue_number, token=token)
-    module_list_obspy_prepended = [f"obspy.{x}" for x in module_list]
+    module_list_obspy_prepended = _append_obspy(module_list)
 
     out = dict(
         module_list=",".join(module_list_obspy_prepended),

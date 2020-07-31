@@ -6,7 +6,11 @@ from typing import Optional
 
 import typer
 
-from obspy_github_api.obspy_github_api import make_ci_json_config
+from obspy_github_api.obspy_github_api import (
+    make_ci_json_config,
+    get_obspy_module_lists,
+    _append_obspy,
+)
 
 app = typer.Typer()
 
@@ -42,6 +46,27 @@ def read_config_value(name: str, path: str = DEFAULT_CONFIG_PATH):
     value = params[name]
     print(value)
     return value
+
+
+@app.command()
+def get_module_list(group: str = "default", sep=" "):
+    """
+    Print and return module lists for use with coverage.
+
+    Parameters
+    ----------
+    group
+        The name of the module group. Options are:
+            default
+            all
+            network
+    sep
+        Character to separate modules, ' ' else ','
+    """
+    mod_list = get_obspy_module_lists()[group]
+    with_obspy = _append_obspy(mod_list)
+    print(sep.join(with_obspy))
+    return with_obspy
 
 
 def main():

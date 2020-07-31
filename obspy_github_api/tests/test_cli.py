@@ -45,3 +45,12 @@ class TestCli:
         run_str = f"obshub read-config-value docs --path {populated_config}"
         out = run(run_str, shell=True, capture_output=True)
         assert out.stdout.decode("utf8").rstrip() == "False"
+
+    def test_get_module_lists(self):
+        """Ensure module lists are retrievable. """
+        run_str = f"obshub get-module-list --sep ' '"
+        out = run(run_str, shell=True, capture_output=True)
+        mod_list = out.stdout.decode("utf8").rstrip().split(" ")
+        assert len(mod_list) > 5
+        for mod in mod_list:
+            assert mod.startswith("obspy.")
